@@ -21,6 +21,11 @@ fate (e.g. `{package} {version}`, as in `btw v1.4.0`), or its current
   platforms, or does it have WARN/ERROR/NOTE flags risking removal? See
   "Check Results".
 
+CRAN's servers are a shared, unpaid resource. Never issue requests in
+parallel or in a tight loop — pause briefly (e.g. `sleep 1`) between
+requests, stop looping as soon as a match is found, and avoid re-fetching a
+page you've already checked in this session.
+
 ## Workflow
 
 1. Ask for the package name if not provided. A version may also be given
@@ -67,17 +72,31 @@ Replace `{package}` with the actual package name:
 for stage in inspect newbies pending pretest publish recheck waiting archive; do
   curl -Ls "https://cran.r-project.org/incoming/$stage/" |
     grep -Eio '[^"]*{package}[^"]*' &&
-    echo "Stage: $stage"
+    echo "Stage: $stage" && break
+  sleep 1
 done
 ```
 
 ## Checking Reviewer-Assigned Folders
 
+Reviewer-initials folders (e.g. `human/KH`) change over time as CRAN's team
+changes, so discover them dynamically from the `incoming/` directory listing
+rather than assuming a fixed set. Any folder in the listing that isn't one of
+the known stage names above is a reviewer-assigned folder:
+
 ```sh
-for stage in BA KH KL LH SU Tyagi UL VW; do
+reviewer_folders=$(
+  curl -Ls "https://cran.r-project.org/incoming/" |
+    grep -Eio '<a href="[^"]+/">' |
+    sed -E 's/<a href="([^"]+)\/">/\1/' |
+    grep -Ev '^(inspect|newbies|pending|pretest|publish|recheck|archive|waiting|special)$'
+)
+
+for stage in $reviewer_folders; do
   curl -Ls "https://cran.r-project.org/incoming/$stage/" |
     grep -Eio '[^"]*{package}[^"]*' &&
-    echo "Stage: $stage"
+    echo "Stage: human/$stage" && break
+  sleep 1
 done
 ```
 
