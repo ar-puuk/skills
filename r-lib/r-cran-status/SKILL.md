@@ -45,31 +45,40 @@ page you've already checked in this session.
 2. If no version was requested, or it matches the current version: report it
    as the current, published release. Skip to step 5 unless it's absent from
    `PACKAGES`, in which case continue to step 3.
-3. Search the `incoming/` stage folders (see below).
-4. Search the reviewer-assigned folders (see below).
-5. If a specific version was requested and doesn't match the current
+3. If a prior check this conversation already located the package in a
+   stage or reviewer folder, check that folder first, then forward from it
+   in the pipeline order (see "CRAN Review Stages") — don't re-sweep from
+   the start. Otherwise, sweep all stage and reviewer folders.
+4. Search the `incoming/` stage folders (see below).
+5. Search the reviewer-assigned folders (see below).
+6. If a specific version was requested and doesn't match the current
    published version (or the package isn't published at all), check the
    CRAN Archive for that version (see below).
-6. Report the result (see "Reporting Submission Status Results").
+7. Report the result (see "Reporting Submission Status Results").
 
 ## CRAN Review Stages
 
-- `inspect`: awaiting manual inspection
-- `newbies`: first-time submission inspection queue
+Listed in typical pipeline order — a package usually moves top to bottom,
+though not every package passes through every stage:
+
+- `inspect` / `newbies`: awaiting initial manual inspection (`newbies` is for
+  first-time submitters)
 - `pending`: awaiting closer review
 - `human/<initials>`: assigned to a CRAN reviewer
-- `waiting`: CRAN is waiting for a maintainer response
-- `pretest`: automated checks rerunning after a fix
-- `archive`: rejected
+- `pretest`: automated checks (re)running
+- `waiting`: CRAN is waiting for a maintainer response (loops back to
+  `pretest` once the maintainer responds)
 - `recheck`: reverse-dependency checks
 - `publish`: approved and awaiting publication
+- `archive`: rejected
 
 ## Checking Incoming Stage Folders
 
-Replace `{package}` with the actual package name:
+Replace `{package}` with the actual package name. Start at the last-known
+stage if one exists (see Submission Status step 3), else at `inspect`:
 
 ```sh
-for stage in inspect newbies pending pretest publish recheck waiting archive; do
+for stage in inspect newbies pending pretest waiting recheck publish archive; do
   curl -Ls "https://cran.r-project.org/incoming/$stage/" |
     grep -Eio '[^"]*{package}[^"]*' &&
     echo "Stage: $stage" && break
@@ -79,10 +88,9 @@ done
 
 ## Checking Reviewer-Assigned Folders
 
-Reviewer-initials folders (e.g. `human/KH`) change over time as CRAN's team
-changes, so discover them dynamically from the `incoming/` directory listing
-rather than assuming a fixed set. Any folder in the listing that isn't one of
-the known stage names above is a reviewer-assigned folder:
+Reviewer-initials folders (e.g. `human/KH`) change as CRAN's team changes,
+so discover them from the `incoming/` listing instead of a fixed set: any
+folder there that isn't one of the stage names above is a reviewer folder.
 
 ```sh
 reviewer_folders=$(
